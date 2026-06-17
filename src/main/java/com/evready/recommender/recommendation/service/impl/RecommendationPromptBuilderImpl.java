@@ -48,6 +48,12 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                 - Do not say a vehicle has home charging.
                 - Home charging is a user condition, not a vehicle feature.
                 - You may say home charging availability improves ownership fit for the user.
+                - Each recommendation factsUsed must include every candidate field used in matchReason or tradeoffs.
+                - If matchReason or tradeoffs mention price, budget, or cost, factsUsed must include pricePkr.
+                - If matchReason or tradeoffs mention range, distance, commute, or daily driving, factsUsed must include rangeKm.
+                - If matchReason or tradeoffs mention DC fast charging or fast charging, factsUsed must include dcFastCharging.
+                - If matchReason or tradeoffs mention verification, unverified, source confidence, or catalogue confidence, factsUsed must include verificationStatus.
+                - If matchReason or tradeoffs mention battery capacity, factsUsed must include batteryCapacityKwh.
         
                 Allowed status values:
                 - ANSWERED

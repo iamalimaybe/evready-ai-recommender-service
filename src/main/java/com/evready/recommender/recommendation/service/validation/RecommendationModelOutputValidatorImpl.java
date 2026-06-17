@@ -196,6 +196,8 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
                     errors.add("Unsupported factsUsed value: " + factUsed);
                 }
             }
+
+            validateFactsUsedCoverage(recommendation, errors);
         }
     }
 
@@ -263,6 +265,125 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
         if (!isBlank(value)) {
             builder.append(' ').append(value);
         }
+    }
+
+    private void validateFactsUsedCoverage(
+            RecommendationModelRecommendation recommendation,
+            List<String> errors
+    ) {
+        String recommendationText = collectRecommendationText(recommendation).toLowerCase(Locale.ROOT);
+        Set<String> factsUsed = new HashSet<>(recommendation.factsUsed());
+
+        requireFactWhenMentioned(
+                recommendationText,
+                factsUsed,
+                "pricePkr",
+                errors,
+                recommendation.vehicleId(),
+                "price, budget, or cost",
+                "price",
+                "budget",
+                "cost",
+                "within budget",
+                "budget-friendly"
+        );
+
+        requireFactWhenMentioned(
+                recommendationText,
+                factsUsed,
+                "rangeKm",
+                errors,
+                recommendation.vehicleId(),
+                "range, distance, commute, or daily driving",
+                "range",
+                "distance",
+                "commute",
+                "daily drive",
+                "daily driving",
+                "daily distance"
+        );
+
+        requireFactWhenMentioned(
+                recommendationText,
+                factsUsed,
+                "dcFastCharging",
+                errors,
+                recommendation.vehicleId(),
+                "DC fast charging or fast charging",
+                "dc fast",
+                "fast charging"
+        );
+
+        requireFactWhenMentioned(
+                recommendationText,
+                factsUsed,
+                "verificationStatus",
+                errors,
+                recommendation.vehicleId(),
+                "verification or source confidence",
+                "verification",
+                "verified",
+                "unverified",
+                "source confidence",
+                "catalogue confidence",
+                "catalog confidence",
+                "source-backed",
+                "source-confirmed"
+        );
+
+        requireFactWhenMentioned(
+                recommendationText,
+                factsUsed,
+                "batteryCapacityKwh",
+                errors,
+                recommendation.vehicleId(),
+                "battery capacity",
+                "battery capacity",
+                "kwh"
+        );
+    }
+
+    private void requireFactWhenMentioned(
+            String recommendationText,
+            Set<String> factsUsed,
+            String requiredFact,
+            List<String> errors,
+            Long vehicleId,
+            String reason,
+            String... triggerPhrases
+    ) {
+        if (!containsAny(recommendationText, triggerPhrases)) {
+            return;
+        }
+
+        if (!factsUsed.contains(requiredFact)) {
+            errors.add("Recommendation for vehicleId "
+                    + vehicleId
+                    + " mentions "
+                    + reason
+                    + " but factsUsed does not include "
+                    + requiredFact
+                    + ".");
+        }
+    }
+
+    private boolean containsAny(String text, String... phrases) {
+        for (String phrase : phrases) {
+            if (text.contains(phrase)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private String collectRecommendationText(RecommendationModelRecommendation recommendation) {
+        StringBuilder builder = new StringBuilder();
+
+        append(builder, recommendation.matchReason());
+        appendAll(builder, recommendation.tradeoffs());
+
+        return builder.toString();
     }
 
     private boolean isBlank(String value) {
