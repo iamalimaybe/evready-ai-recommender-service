@@ -87,9 +87,12 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         String prompt = promptBuilder.buildPrompt(request, candidateSelection.candidates());
+        String rawModelOutput = null;
 
         try {
             ModelGenerationResponse modelResponse = modelGenerationClient.generate(new ModelGenerationRequest(prompt));
+            rawModelOutput = modelResponse.rawOutput();
+
             run.recordModelMetadata(
                     modelResponse.provider(),
                     modelResponse.modelName(),
@@ -97,7 +100,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                     modelResponse.runConfigJson()
             );
 
-            RecommendationModelOutput output = outputParser.parse(modelResponse.rawOutput());
+            RecommendationModelOutput output = outputParser.parse(rawModelOutput);
             RecommendationOutputValidationResult validationResult = outputValidator.validate(
                     output,
                     candidateSelection.candidates()
@@ -105,7 +108,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
             if (!validationResult.valid()) {
                 String failureReason = String.join("; ", validationResult.errors());
-                run.markFailed(failureReason, modelResponse.rawOutput());
+                run.markFailed(failureReason, rawModelOutput);
                 return failedResult(run, candidateSelection, failureReason);
             }
 
@@ -122,7 +125,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             run.markCompleted(
                     validationResult.status(),
                     output.summary(),
-                    modelResponse.rawOutput(),
+                    rawModelOutput,
                     toJson(output),
                     RecommendationValidationStatus.VALID
             );
@@ -144,7 +147,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             );
         } catch (RuntimeException ex) {
             String failureReason = safeFailureReason(ex);
-            run.markFailed(failureReason, null);
+            run.markFailed(failureReason, rawModelOutput);
             return failedResult(run, candidateSelection, failureReason);
         }
     }
