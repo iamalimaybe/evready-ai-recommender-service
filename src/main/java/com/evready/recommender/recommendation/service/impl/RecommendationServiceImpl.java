@@ -83,6 +83,11 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         saveCandidateSnapshots(run.getId(), candidateSelection.candidates());
 
+        run.recordResponseMetadata(
+                toJson(candidateSelection.missingInformation()),
+                toJson(candidateSelection.warnings())
+        );
+
         if (candidateSelection.candidates().isEmpty()) {
             return completeWithoutModel(run, candidateSelection);
         }
@@ -123,6 +128,11 @@ public class RecommendationServiceImpl implements RecommendationService {
             List<String> warnings = mergeDistinct(
                     candidateSelection.warnings(),
                     output.warnings()
+            );
+
+            run.recordResponseMetadata(
+                    toJson(missingInformation),
+                    toJson(warnings)
             );
 
             run.markCompleted(
@@ -178,8 +188,8 @@ public class RecommendationServiceImpl implements RecommendationService {
                 run.getStatus(),
                 run.getSummary(),
                 recommendations,
-                List.of(),
-                List.of(),
+                readStringList(run.getMissingInformationJson()),
+                readStringList(run.getWarningsJson()),
                 run.getValidationStatus(),
                 run.getFailureReason()
         );
@@ -190,6 +200,11 @@ public class RecommendationServiceImpl implements RecommendationService {
             CandidateSelectionResult candidateSelection
     ) {
         String summary = "No catalogue vehicles matched the provided constraints closely enough.";
+
+        run.recordResponseMetadata(
+                toJson(candidateSelection.missingInformation()),
+                toJson(candidateSelection.warnings())
+        );
 
         run.markCompleted(
                 RecommendationRunStatus.INSUFFICIENT_CANDIDATES,

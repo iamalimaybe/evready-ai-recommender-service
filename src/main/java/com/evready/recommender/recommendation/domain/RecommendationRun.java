@@ -68,6 +68,14 @@ public class RecommendationRun {
     @Column(name = "run_config_json", columnDefinition = "jsonb")
     private String runConfigJson;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "missing_information_json", columnDefinition = "jsonb")
+    private String missingInformationJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "warnings_json", columnDefinition = "jsonb")
+    private String warningsJson;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -119,6 +127,11 @@ public class RecommendationRun {
         this.modelName = modelName;
         this.temperature = temperature;
         this.runConfigJson = runConfigJson;
+    }
+
+    public void recordResponseMetadata(String missingInformationJson, String warningsJson) {
+        this.missingInformationJson = missingInformationJson;
+        this.warningsJson = warningsJson;
     }
 
     @PrePersist
