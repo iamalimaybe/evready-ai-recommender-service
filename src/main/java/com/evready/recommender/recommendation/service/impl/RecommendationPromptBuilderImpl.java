@@ -38,6 +38,10 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                 - Do not give financing, insurance, legal, or tax advice.
                 - Be cautious when price, range, source confidence, or charging data may be uncertain.
                 - If useful recommendations are not possible, return INSUFFICIENT_CANDIDATES or NEEDS_MORE_INFORMATION.
+                - Do not infer route feasibility from range or DC fast charging alone.
+                - Do not say a vehicle supports a specific intercity route unless route and charger data are explicitly provided.
+                - If the user mentions a route or long trip, say DC fast charging may be useful but route distance, charger availability, connector compatibility, pricing, and access must be checked separately.
+                - Do not claim a vehicle can handle Lahore to Islamabad or any other route based only on catalogue facts.
 
                 Allowed status values:
                 - ANSWERED

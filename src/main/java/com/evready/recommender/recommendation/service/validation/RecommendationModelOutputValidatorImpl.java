@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class RecommendationModelOutputValidatorImpl implements RecommendationModelOutputValidator {
@@ -58,6 +59,16 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
             "guaranteed price",
             "confirmed current price",
             "definitely available"
+    );
+
+    private static final List<Pattern> UNSUPPORTED_CLAIM_PATTERNS = List.of(
+            Pattern.compile("\\bsupports\\s+occasional\\s+.*\\btravel\\b"),
+            Pattern.compile("\\bcan\\s+handle\\s+.*\\broute\\b"),
+            Pattern.compile("\\bcan\\s+handle\\s+.*\\btravel\\b"),
+            Pattern.compile("\\bcan\\s+complete\\s+.*\\broute\\b"),
+            Pattern.compile("\\bcan\\s+complete\\s+.*\\btrip\\b"),
+            Pattern.compile("\\blahore\\s+to\\s+islamabad\\b.*\\b(supports|handle|complete|feasible)\\b"),
+            Pattern.compile("\\b(supports|handle|complete|feasible)\\b.*\\blahore\\s+to\\s+islamabad\\b")
     );
 
     @Override
@@ -210,6 +221,12 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
         for (String phrase : UNSUPPORTED_CLAIM_PHRASES) {
             if (combinedText.contains(phrase)) {
                 errors.add("Unsupported claim detected: " + phrase);
+            }
+        }
+
+        for (Pattern pattern : UNSUPPORTED_CLAIM_PATTERNS) {
+            if (pattern.matcher(combinedText).find()) {
+                errors.add("Unsupported route or travel-confidence claim detected: " + pattern.pattern());
             }
         }
     }
