@@ -24,7 +24,7 @@ Expected local model:
 qwen3:4b
 ```
 
-Candidate Selection Smoke
+## Candidate Selection Smoke
 
 ```text
 .\scratch\smoke\run-candidate-selection-smoke.ps1
@@ -38,7 +38,7 @@ POST /api/v1/recommendations/candidates
 
 It verifies deterministic catalog-backed candidate selection without calling the LLM.
 
-Full Recommendation Smoke
+## Full Recommendation Smoke
 
 ```text
 .\scratch\smoke\run-recommendation-smoke.ps1
@@ -57,3 +57,18 @@ Notes
 Model responses may vary slightly between runs.
 
 Do not treat one smoke result as proof of recommendation quality. Smoke scripts only verify that the local flow works end to end.
+
+## Recommendation Round-Trip Smoke
+
+```powershell
+.\scratch\smoke\run-recommendation-roundtrip-smoke.ps1
+```
+
+This verifies the persisted recommendation flow:
+
+```text
+POST /api/v1/recommendations
+GET /api/v1/recommendations/{id}
+```
+
+The script creates a recommendation, captures the returned ID, retrieves the same recommendation, and verifies the stored ID and status match.
