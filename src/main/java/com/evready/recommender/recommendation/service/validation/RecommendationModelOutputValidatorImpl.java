@@ -58,7 +58,15 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
             "physically audited",
             "guaranteed price",
             "confirmed current price",
-            "definitely available"
+            "definitely available",
+            "limited dc fast charging infrastructure",
+            "limited fast charging infrastructure",
+            "limited charging infrastructure",
+            "poor charging infrastructure",
+            "insufficient charging infrastructure",
+            "charging infrastructure is limited",
+            "dc fast charging infrastructure is limited",
+            "fast charging infrastructure is limited"
     );
 
     private static final List<Pattern> UNSUPPORTED_CLAIM_PATTERNS = List.of(

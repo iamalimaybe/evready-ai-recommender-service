@@ -42,6 +42,9 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                 - Do not say a vehicle supports a specific intercity route unless route and charger data are explicitly provided.
                 - If the user mentions a route or long trip, say DC fast charging may be useful, but route distance, charger availability, connector compatibility, pricing, and access must be checked separately.
                 - Do not claim a vehicle can handle Lahore to Islamabad or any other route based only on catalogue facts.
+                - Do not say charging infrastructure is limited unless charger coverage data is explicitly provided.
+                - Do not explain route caution using unsupported infrastructure claims.
+                - For long-trip or route warnings, use this neutral wording: "Route distance, charger availability, connector compatibility, pricing, and access should be checked separately."
                 - Return at most 3 recommendations.
                 - Keep each matchReason under 35 words.
                 - Keep each tradeoff under 20 words.
