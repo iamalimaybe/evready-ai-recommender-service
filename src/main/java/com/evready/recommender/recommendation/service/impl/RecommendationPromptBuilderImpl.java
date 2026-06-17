@@ -45,6 +45,9 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                 - Do not say charging infrastructure is limited unless charger coverage data is explicitly provided.
                 - Do not explain route caution using unsupported infrastructure claims.
                 - For long-trip or route warnings, use this neutral wording: "Route distance, charger availability, connector compatibility, pricing, and access should be checked separately."
+                - For vehicle DC charging capability, say "supports DC fast charging".
+                - Do not say "DC fast charging available" because availability can imply live charger availability.
+                - Use "availability" only when warning the user to check charger availability separately.
                 - Return at most 3 recommendations.
                 - Keep each matchReason under 35 words.
                 - Keep each tradeoff under 20 words.

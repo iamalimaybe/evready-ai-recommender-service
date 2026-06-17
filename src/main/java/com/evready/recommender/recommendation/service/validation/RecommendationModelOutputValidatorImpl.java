@@ -66,7 +66,10 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
             "insufficient charging infrastructure",
             "charging infrastructure is limited",
             "dc fast charging infrastructure is limited",
-            "fast charging infrastructure is limited"
+            "fast charging infrastructure is limited",
+            "dc fast charging available",
+            "fast charging available",
+            "dc charging available"
     );
 
     private static final List<Pattern> UNSUPPORTED_CLAIM_PATTERNS = List.of(
@@ -75,8 +78,12 @@ public class RecommendationModelOutputValidatorImpl implements RecommendationMod
             Pattern.compile("\\bcan\\s+handle\\s+.*\\btravel\\b"),
             Pattern.compile("\\bcan\\s+complete\\s+.*\\broute\\b"),
             Pattern.compile("\\bcan\\s+complete\\s+.*\\btrip\\b"),
-            Pattern.compile("\\blahore\\s+to\\s+islamabad\\b.*\\b(supports|handle|complete|feasible)\\b"),
-            Pattern.compile("\\b(supports|handle|complete|feasible)\\b.*\\blahore\\s+to\\s+islamabad\\b")
+            Pattern.compile("\\blahore\\s+to\\s+islamabad\\s+.*\\bis\\s+feasible\\b"),
+            Pattern.compile("\\blahore\\s+to\\s+islamabad\\s+.*\\bis\\s+supported\\b"),
+            Pattern.compile("\\blahore\\s+to\\s+islamabad\\s+.*\\bcan\\s+be\\s+completed\\b"),
+            Pattern.compile("\\bsupports\\s+lahore\\s+to\\s+islamabad\\s+.*\\btravel\\b"),
+            Pattern.compile("\\bcan\\s+handle\\s+lahore\\s+to\\s+islamabad\\b"),
+            Pattern.compile("\\bcan\\s+complete\\s+lahore\\s+to\\s+islamabad\\b")
     );
 
     @Override
