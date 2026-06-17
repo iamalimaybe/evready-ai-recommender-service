@@ -22,9 +22,9 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
     public String buildPrompt(RecommendationRequest request, List<CandidateVehicle> candidates) {
         return """
                 You are an EV recommendation assistant for EVReady Pakistan.
-
+        
                 Your task is to recommend EV options only from the provided candidate vehicles.
-
+        
                 Strict rules:
                 - Use only the candidate vehicle facts provided below.
                 - Do not invent vehicles.
@@ -40,14 +40,20 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                 - If useful recommendations are not possible, return INSUFFICIENT_CANDIDATES or NEEDS_MORE_INFORMATION.
                 - Do not infer route feasibility from range or DC fast charging alone.
                 - Do not say a vehicle supports a specific intercity route unless route and charger data are explicitly provided.
-                - If the user mentions a route or long trip, say DC fast charging may be useful but route distance, charger availability, connector compatibility, pricing, and access must be checked separately.
+                - If the user mentions a route or long trip, say DC fast charging may be useful, but route distance, charger availability, connector compatibility, pricing, and access must be checked separately.
                 - Do not claim a vehicle can handle Lahore to Islamabad or any other route based only on catalogue facts.
-
+                - Return at most 3 recommendations.
+                - Keep each matchReason under 35 words.
+                - Keep each tradeoff under 20 words.
+                - Do not say a vehicle has home charging.
+                - Home charging is a user condition, not a vehicle feature.
+                - You may say home charging availability improves ownership fit for the user.
+        
                 Allowed status values:
                 - ANSWERED
                 - INSUFFICIENT_CANDIDATES
                 - NEEDS_MORE_INFORMATION
-
+        
                 Allowed factsUsed values:
                 - vehicleType
                 - brandName
@@ -62,11 +68,11 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                 - chargerTypeName
                 - preFilterScore
                 - selectionNotes
-
+        
                 Return strict JSON only.
                 Do not include markdown.
                 Do not include explanation outside JSON.
-
+        
                 Required JSON shape:
                 {
                   "status": "ANSWERED",
@@ -83,10 +89,10 @@ public class RecommendationPromptBuilderImpl implements RecommendationPromptBuil
                   "missingInformation": [],
                   "warnings": []
                 }
-
+        
                 User request:
                 %s
-
+        
                 Candidate vehicles:
                 %s
                 """.formatted(toJson(request), toJson(candidates));

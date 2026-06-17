@@ -17,7 +17,7 @@ import java.util.Locale;
 @Service
 public class CandidateSelectionServiceImpl implements CandidateSelectionService {
 
-    private static final int MAX_CANDIDATES = 8;
+    private static final int MAX_CANDIDATES = 5;
 
     private final EvreadyCatalogClient catalogClient;
 
@@ -141,7 +141,6 @@ public class CandidateSelectionServiceImpl implements CandidateSelectionService 
 
         if (Boolean.TRUE.equals(request.homeChargingAvailable())) {
             score += 5;
-            notes.add("Home charging availability improves ownership fit.");
         }
 
         return new CandidateVehicle(
