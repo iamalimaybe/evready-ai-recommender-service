@@ -12,10 +12,7 @@ import com.evready.recommender.recommendation.domain.RecommendationValidationSta
 import com.evready.recommender.recommendation.repository.RecommendationCandidateSnapshotRepository;
 import com.evready.recommender.recommendation.repository.RecommendationResultRepository;
 import com.evready.recommender.recommendation.repository.RecommendationRunRepository;
-import com.evready.recommender.recommendation.service.CandidateSelectionService;
-import com.evready.recommender.recommendation.service.RecommendationModelOutputParser;
-import com.evready.recommender.recommendation.service.RecommendationPromptBuilder;
-import com.evready.recommender.recommendation.service.RecommendationService;
+import com.evready.recommender.recommendation.service.*;
 import com.evready.recommender.recommendation.service.dto.CandidateSelectionResult;
 import com.evready.recommender.recommendation.service.dto.CandidateVehicle;
 import com.evready.recommender.recommendation.service.dto.RecommendationExecutionRecommendation;
@@ -46,6 +43,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final RecommendationCandidateSnapshotRepository candidateSnapshotRepository;
     private final RecommendationResultRepository resultRepository;
     private final ObjectMapper objectMapper;
+    private final RecommendationModelOutputEnricher outputEnricher;
 
     public RecommendationServiceImpl(
             CandidateSelectionService candidateSelectionService,
@@ -56,7 +54,8 @@ public class RecommendationServiceImpl implements RecommendationService {
             RecommendationRunRepository runRepository,
             RecommendationCandidateSnapshotRepository candidateSnapshotRepository,
             RecommendationResultRepository resultRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            RecommendationModelOutputEnricher outputEnricher
     ) {
         this.candidateSelectionService = candidateSelectionService;
         this.promptBuilder = promptBuilder;
@@ -67,6 +66,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         this.candidateSnapshotRepository = candidateSnapshotRepository;
         this.resultRepository = resultRepository;
         this.objectMapper = objectMapper;
+        this.outputEnricher = outputEnricher;
     }
 
     @Override
@@ -100,7 +100,9 @@ public class RecommendationServiceImpl implements RecommendationService {
                     modelResponse.runConfigJson()
             );
 
-            RecommendationModelOutput output = outputParser.parse(rawModelOutput);
+            RecommendationModelOutput parsedOutput = outputParser.parse(rawModelOutput);
+            RecommendationModelOutput output = outputEnricher.enrich(parsedOutput);
+
             RecommendationOutputValidationResult validationResult = outputValidator.validate(
                     output,
                     candidateSelection.candidates()
