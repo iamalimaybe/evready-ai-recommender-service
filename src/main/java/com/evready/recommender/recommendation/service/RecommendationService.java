@@ -6,4 +6,6 @@ import com.evready.recommender.recommendation.service.dto.RecommendationExecutio
 public interface RecommendationService {
 
     RecommendationExecutionResult createRecommendation(RecommendationRequest request);
+
+    RecommendationExecutionResult getRecommendation(Long id);
 }

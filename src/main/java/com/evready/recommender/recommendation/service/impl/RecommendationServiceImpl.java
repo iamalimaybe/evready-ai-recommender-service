@@ -22,6 +22,7 @@ import com.evready.recommender.recommendation.service.model.RecommendationModelR
 import com.evready.recommender.recommendation.service.validation.RecommendationModelOutputValidator;
 import com.evready.recommender.recommendation.service.validation.RecommendationOutputValidationResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -154,6 +155,36 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public RecommendationExecutionResult getRecommendation(Long id) {
+        RecommendationRun run = runRepository.findById(id)
+                .orElseThrow(() -> new RecommendationNotFoundException(id));
+
+        List<RecommendationExecutionRecommendation> recommendations = resultRepository
+                .findByRecommendationRunIdOrderByRankAsc(run.getId())
+                .stream()
+                .map(result -> new RecommendationExecutionRecommendation(
+                        result.getVehicleId(),
+                        result.getRank(),
+                        result.getMatchReason(),
+                        readStringList(result.getTradeoffsJson()),
+                        readStringList(result.getFactsUsedJson())
+                ))
+                .toList();
+
+        return new RecommendationExecutionResult(
+                run.getId(),
+                run.getStatus(),
+                run.getSummary(),
+                recommendations,
+                List.of(),
+                List.of(),
+                run.getValidationStatus(),
+                run.getFailureReason()
+        );
+    }
+
     private RecommendationExecutionResult completeWithoutModel(
             RecommendationRun run,
             CandidateSelectionResult candidateSelection
@@ -274,5 +305,18 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         return ex.getMessage();
+    }
+
+    private List<String> readStringList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Failed to deserialize stored recommendation list.", ex);
+        }
     }
 }

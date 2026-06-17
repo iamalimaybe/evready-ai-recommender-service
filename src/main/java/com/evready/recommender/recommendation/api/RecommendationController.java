@@ -28,4 +28,10 @@ public class RecommendationController {
         RecommendationExecutionResult result = recommendationService.createRecommendation(request);
         return responseMapper.toResponse(result);
     }
+
+    @GetMapping("/{id}")
+    public RecommendationResponse getRecommendation(@PathVariable Long id) {
+        RecommendationExecutionResult result = recommendationService.getRecommendation(id);
+        return responseMapper.toResponse(result);
+    }
 }
