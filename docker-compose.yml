@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: evready-recommender-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-evready_recommender}
+      POSTGRES_USER: ${DB_USER:-evready_recommender}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-evready_recommender_pass}
+    ports:
+      - "${DB_PORT:-5435}:5432"
+    volumes:
+      - evready_recommender_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  evready_recommender_postgres_data:
