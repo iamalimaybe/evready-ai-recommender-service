@@ -45,6 +45,7 @@ public class OllamaModelGenerationClient implements ModelGenerationClient {
                 response.response(),
                 PROVIDER,
                 properties.ollama().model(),
+                properties.ollama().temperature(),
                 runConfigJson()
         );
     }

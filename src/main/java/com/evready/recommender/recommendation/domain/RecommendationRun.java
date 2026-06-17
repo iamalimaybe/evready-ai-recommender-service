@@ -114,6 +114,13 @@ public class RecommendationRun {
         this.rawModelOutput = rawModelOutput;
     }
 
+    public void recordModelMetadata(String modelProvider, String modelName, BigDecimal temperature, String runConfigJson) {
+        this.modelProvider = modelProvider;
+        this.modelName = modelName;
+        this.temperature = temperature;
+        this.runConfigJson = runConfigJson;
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
