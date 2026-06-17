@@ -72,3 +72,18 @@ GET /api/v1/recommendations/{id}
 ```
 
 The script creates a recommendation, captures the returned ID, retrieves the same recommendation, and verifies the stored ID and status match.
+
+## Error Response Smoke
+
+```text
+.\scratch\smoke\run-error-response-smoke.ps1
+```
+
+This verifies consistent API error responses for:
+
+```text
+POST /api/v1/recommendations with invalid request data
+GET /api/v1/recommendations/{id} with a missing ID
+```
+
+The script checks HTTP status codes and confirms the response body uses the standard API error shape.
