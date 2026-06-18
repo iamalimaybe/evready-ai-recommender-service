@@ -78,7 +78,61 @@ public class CandidateSelectionServiceImpl implements CandidateSelectionService 
             warnings.add("Home charging is not available, so public charging access should be checked carefully before choosing an EV.");
         }
 
+        String routeWarning = buildRouteWarning(request);
+
+        if (!isBlank(routeWarning)) {
+            warnings.add(routeWarning);
+        }
+
         return warnings;
+    }
+
+    private String buildRouteWarning(RecommendationRequest request) {
+        String requestText = normalize(
+                joinText(
+                        request.city(),
+                        request.primaryUseCase(),
+                        request.priority(),
+                        request.additionalNotes()
+                )
+        );
+
+        if (requestText.contains("lahore") && requestText.contains("islamabad")) {
+            return "Route distance, charger availability, connector compatibility, pricing, and access should be checked separately for Lahore to Islamabad travel.";
+        }
+
+        if (mentionsIntercityTravel(requestText)) {
+            return "Route distance, charger availability, connector compatibility, pricing, and access should be checked separately for intercity travel.";
+        }
+
+        return null;
+    }
+
+    private boolean mentionsIntercityTravel(String requestText) {
+        return requestText.contains("intercity")
+                || requestText.contains("long trip")
+                || requestText.contains("long-trip")
+                || requestText.contains("long distance")
+                || requestText.contains("long-distance")
+                || requestText.contains("highway")
+                || requestText.contains("outstation")
+                || requestText.contains("out of city");
+    }
+
+    private String joinText(String... values) {
+        StringBuilder builder = new StringBuilder();
+
+        for (String value : values) {
+            if (!isBlank(value)) {
+                if (!builder.isEmpty()) {
+                    builder.append(' ');
+                }
+
+                builder.append(value);
+            }
+        }
+
+        return builder.toString();
     }
 
     private boolean matchesVehicleType(EvreadyVehicleResponse vehicle, String requestedVehicleType) {

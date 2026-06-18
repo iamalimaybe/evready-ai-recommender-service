@@ -7,7 +7,7 @@ if ([string]::IsNullOrWhiteSpace($baseUrl)) {
 }
 
 $pollIntervalSeconds = 3
-$maxPollAttempts = 30
+$maxPollAttempts = 10
 $inProgressStatuses = @("PENDING", "QUEUED", "RUNNING")
 
 function Wait-ForRecommendationResult {
@@ -31,6 +31,10 @@ function Wait-ForRecommendationResult {
 
     throw "Recommendation id $RecommendationId did not reach a final status after $maxPollAttempts polling attempts."
 }
+
+Write-Host "Timeout smoke expects the recommender service to be running with:"
+Write-Host "OLLAMA_READ_TIMEOUT=1s"
+Write-Host ""
 
 $bodyJson = @{
     vehicleType = "CAR"
@@ -71,23 +75,19 @@ Write-Host "Polling recommendation id $($postResponse.id)..."
 
 $finalResponse = Wait-ForRecommendationResult -RecommendationId $postResponse.id
 
-if ($finalResponse.id -ne $postResponse.id) {
-    throw "Final response id $($finalResponse.id) did not match POST response id $($postResponse.id)."
+if ($finalResponse.status -ne "TIMED_OUT") {
+    $finalResponse | ConvertTo-Json -Depth 20
+    throw "Expected final status TIMED_OUT but got $($finalResponse.status)."
 }
 
-if ($finalResponse.status -ne "ANSWERED") {
+if ($finalResponse.validationStatus -ne "INVALID") {
     $finalResponse | ConvertTo-Json -Depth 20
-    throw "Expected final status ANSWERED but got $($finalResponse.status)."
+    throw "Expected validationStatus INVALID but got $($finalResponse.validationStatus)."
 }
 
-if ($finalResponse.validationStatus -ne "VALID") {
+if ([string]::IsNullOrWhiteSpace($finalResponse.failureReason)) {
     $finalResponse | ConvertTo-Json -Depth 20
-    throw "Expected validationStatus VALID but got $($finalResponse.validationStatus)."
-}
-
-if ($null -eq $finalResponse.recommendations -or $finalResponse.recommendations.Count -eq 0) {
-    $finalResponse | ConvertTo-Json -Depth 20
-    throw "Expected at least one recommendation."
+    throw "Expected timeout failureReason to be present."
 }
 
 Write-Host ""
@@ -95,4 +95,4 @@ Write-Host "Final response:"
 $finalResponse | ConvertTo-Json -Depth 20
 
 Write-Host ""
-Write-Host "Recommendation smoke passed for recommendation id $($postResponse.id)."
+Write-Host "Timeout smoke passed for recommendation id $($postResponse.id)."

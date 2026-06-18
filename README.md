@@ -12,22 +12,27 @@ EVReady AI Recommender Service is an early MVP backend service.
 
 Implemented so far:
 
-* Spring Boot service skeleton
+* Spring Boot backend service
 * PostgreSQL persistence with Liquibase migrations
 * EVReady backend catalogue client
 * deterministic candidate selection
+* asynchronous recommendation processing
+* bounded recommendation worker queue
 * Ollama model generation client
+* configurable Ollama connect and read timeouts
+* timeout-safe recommendation status handling
 * structured recommendation prompt
 * strict JSON model-output parsing
 * deterministic facts-used enrichment
+* deterministic route and intercity travel warnings
 * safety and traceability validation
 * recommendation run persistence
 * candidate snapshot persistence
 * recommendation result persistence
 * stored response metadata
+* candidate selection endpoint
 * create recommendation endpoint
 * retrieve recommendation endpoint
-* candidate selection endpoint
 * consistent API error responses
 * manual smoke scripts
 * focused unit tests for validation and enrichment
@@ -90,6 +95,7 @@ EVReady Frontend
       - recommendation API
       - EVReady catalogue client
       - deterministic candidate filtering
+      - asynchronous processing
       - LLM explanation and ranking
       - structured output parsing
       - deterministic output enrichment
@@ -153,20 +159,33 @@ This is useful for debugging the candidate pool before model ranking.
 POST /api/v1/recommendations
 ```
 
-Runs the full recommendation flow:
+Creates a recommendation run and returns quickly with an ID.
 
-1. load EV catalogue data from EVReady backend
-2. select deterministic candidates
-3. store recommendation run
-4. store candidate snapshots
-5. build prompt
-6. call Ollama
-7. parse model JSON
-8. enrich facts used
-9. validate output
-10. store recommendation results
-11. store response metadata
-12. return validated response
+This endpoint is asynchronous. It does not wait for Ollama to finish before returning.
+
+The synchronous part of the flow:
+
+1. validate the request
+2. load EV catalogue data from the EVReady backend
+3. select deterministic candidates
+4. store the recommendation run
+5. store candidate snapshots
+6. store initial missing information and warnings
+7. return the run ID with status `QUEUED`
+
+The background part of the flow:
+
+1. mark the run as `RUNNING`
+2. build the model prompt
+3. call Ollama
+4. parse model JSON
+5. enrich facts used
+6. validate output
+7. store recommendation results
+8. store raw and parsed model output
+9. mark the run as a final status
+
+The frontend or API consumer should poll the retrieve endpoint until a final status is reached.
 
 ### Get Recommendation
 
@@ -174,7 +193,47 @@ Runs the full recommendation flow:
 GET /api/v1/recommendations/{id}
 ```
 
-Returns a stored recommendation run with persisted recommendation results, warnings, missing information, validation status, and failure reason.
+Returns the current or final stored recommendation run with persisted recommendation results, warnings, missing information, validation status, and failure reason.
+
+This endpoint is used for polling after creating a recommendation.
+
+## Recommendation Statuses
+
+In-progress statuses:
+
+```text
+PENDING
+QUEUED
+RUNNING
+```
+
+Final statuses:
+
+```text
+ANSWERED
+INSUFFICIENT_CANDIDATES
+NEEDS_MORE_INFORMATION
+FAILED
+TIMED_OUT
+```
+
+Expected frontend behavior:
+
+1. submit `POST /api/v1/recommendations`
+2. store the returned `id`
+3. show a loading state
+4. poll `GET /api/v1/recommendations/{id}`
+5. continue polling while status is `PENDING`, `QUEUED`, or `RUNNING`
+6. stop polling when a final status is returned
+7. render the recommendation, no-match state, timeout state, or safe failure state
+
+Recommended local polling interval:
+
+```text
+3 seconds
+```
+
+A frontend may stop polling after a client-side waiting limit, such as 90 seconds, but that does not automatically mean the backend run failed. The stored run can still be checked again by ID.
 
 ## Example Request
 
@@ -194,11 +253,29 @@ Returns a stored recommendation run with persisted recommendation results, warni
 }
 ```
 
-## Example Response Shape
+## Example Initial Response
 
 ```json
 {
-  "id": 11,
+  "id": 22,
+  "status": "QUEUED",
+  "summary": "Recommendation request accepted. Check this id for the generated result.",
+  "recommendations": [],
+  "missingInformation": [],
+  "warnings": [
+    "Vehicle prices, specs, range, and availability should be verified before purchase.",
+    "Route distance, charger availability, connector compatibility, pricing, and access should be checked separately for Lahore to Islamabad travel."
+  ],
+  "validationStatus": "NOT_VALIDATED",
+  "failureReason": null
+}
+```
+
+## Example Final Response
+
+```json
+{
+  "id": 22,
   "status": "ANSWERED",
   "summary": "Three EVs within budget with DC fast charging support; range covers daily commute but longer trips require separate checks.",
   "recommendations": [
@@ -227,6 +304,29 @@ Returns a stored recommendation run with persisted recommendation results, warni
 }
 ```
 
+## Example Timeout Response
+
+If model generation takes too long, the run is marked safely as `TIMED_OUT`.
+
+```json
+{
+  "id": 18,
+  "status": "TIMED_OUT",
+  "summary": null,
+  "recommendations": [],
+  "missingInformation": [
+    "Home charging availability was not provided."
+  ],
+  "warnings": [
+    "Vehicle prices, specs, range, and availability should be verified before purchase."
+  ],
+  "validationStatus": "INVALID",
+  "failureReason": "Ollama model generation timed out after PT1S."
+}
+```
+
+The exact timeout duration depends on environment configuration.
+
 ## Safety And Validation
 
 The model output is not trusted directly.
@@ -254,6 +354,24 @@ This gives the system both:
 * original raw model output for audit
 * enriched and validated output for the API response
 
+## Deterministic Warnings
+
+The service adds some warnings deterministically before the model response is available.
+
+Examples:
+
+* vehicle prices, specs, range, and availability should be verified before purchase
+* home charging concerns when home charging is unavailable
+* route and charger checks for intercity travel
+
+For Lahore to Islamabad travel, the service should include:
+
+```text
+Route distance, charger availability, connector compatibility, pricing, and access should be checked separately for Lahore to Islamabad travel.
+```
+
+This warning is not left to the model. It is added by backend logic so it appears consistently in queued, running, answered, failed, and timed-out recommendation states.
+
 ## Data Trust Rules
 
 This service only uses catalogue data returned by the existing EVReady backend.
@@ -271,6 +389,76 @@ Important constraints:
 The recommender can say a vehicle supports DC fast charging if that field is present in the catalogue data.
 
 It must not say DC fast charging is available in a way that implies live charger availability.
+
+## Slow Model Handling
+
+Local Ollama generation can be slow, especially when the model is cold or the machine is under load.
+
+The service handles this by:
+
+* returning `QUEUED` quickly from `POST /api/v1/recommendations`
+* processing model generation in a background worker
+* allowing clients to poll `GET /api/v1/recommendations/{id}`
+* limiting concurrent recommendation processing
+* limiting queue capacity
+* applying configurable Ollama connect and read timeouts
+* marking slow or stuck model runs as `TIMED_OUT`
+
+This prevents the public request flow from depending on one long synchronous browser request.
+
+## Queue And Timeout Configuration
+
+Default behavior is conservative for local development:
+
+```text
+1 recommendation worker
+10 queued recommendation jobs
+5 second Ollama connect timeout
+90 second Ollama read timeout
+```
+
+Environment variables:
+
+```text
+RECOMMENDATION_PROCESSING_CORE_POOL_SIZE=1
+RECOMMENDATION_PROCESSING_MAX_POOL_SIZE=1
+RECOMMENDATION_PROCESSING_QUEUE_CAPACITY=10
+
+OLLAMA_CONNECT_TIMEOUT=5s
+OLLAMA_READ_TIMEOUT=90s
+```
+
+If the queue is full, the service should fail the run safely instead of allowing unlimited public work to pile up.
+
+## Access Control And Production Exposure
+
+This MVP does not currently include user accounts or authentication.
+
+For local development, the frontend may call the recommender service directly:
+
+```text
+http://localhost:8081
+```
+
+For production, the recommender service should not be treated as a public unrestricted API.
+
+Preferred production direction:
+
+```text
+Browser / evready.pk
+  -> existing EVReady backend or controlled API gateway
+      -> internal EVReady AI Recommender Service
+```
+
+This keeps the recommender service private or protected while the existing EVReady backend remains the public integration point.
+
+Important notes:
+
+* CORS is not a security boundary.
+* A frontend-only API key is not a secret.
+* Browser JavaScript cannot safely hide backend credentials.
+* If the recommender is exposed publicly, it should have rate limiting, request-size limits, queue limits, timeouts, and proper access control.
+* The current service should not be deployed as an unrestricted public model-generation endpoint.
 
 ## Database And Liquibase
 
@@ -375,6 +563,12 @@ OLLAMA_MODEL=qwen3:4b
 OLLAMA_TEMPERATURE=0
 OLLAMA_NUM_PREDICT=1024
 OLLAMA_NUM_CTX=4096
+OLLAMA_CONNECT_TIMEOUT=5s
+OLLAMA_READ_TIMEOUT=90s
+
+RECOMMENDATION_PROCESSING_CORE_POOL_SIZE=1
+RECOMMENDATION_PROCESSING_MAX_POOL_SIZE=1
+RECOMMENDATION_PROCESSING_QUEUE_CAPACITY=10
 ```
 
 Do not commit real secrets.
@@ -393,6 +587,7 @@ Available scripts:
 .\scratch\smoke\run-candidate-selection-smoke.ps1
 .\scratch\smoke\run-recommendation-smoke.ps1
 .\scratch\smoke\run-recommendation-roundtrip-smoke.ps1
+.\scratch\smoke\run-timeout-smoke.ps1
 .\scratch\smoke\run-error-response-smoke.ps1
 ```
 
@@ -410,7 +605,15 @@ Verifies deterministic catalogue-backed candidate selection without calling the 
 .\scratch\smoke\run-recommendation-smoke.ps1
 ```
 
-Verifies candidate selection, prompt construction, Ollama generation, JSON parsing, enrichment, validation, persistence, and response mapping.
+Verifies async recommendation creation, polling, candidate selection, prompt construction, Ollama generation, JSON parsing, enrichment, validation, persistence, and response mapping.
+
+Expected behavior:
+
+```text
+POST returns QUEUED
+GET eventually returns ANSWERED
+validationStatus is VALID
+```
 
 ### Recommendation Round-Trip Smoke
 
@@ -423,9 +626,48 @@ Verifies the persisted recommendation flow:
 ```text
 POST /api/v1/recommendations
 GET /api/v1/recommendations/{id}
+GET /api/v1/recommendations/{id}
 ```
 
-The script creates a recommendation, captures the returned ID, retrieves the same recommendation, and verifies the stored ID and status match.
+The script creates a recommendation, captures the returned ID, polls until a final status is reached, retrieves the same recommendation again, and verifies the stored ID, status, validation status, and recommendation results.
+
+### Timeout Smoke
+
+```powershell
+.\scratch\smoke\run-timeout-smoke.ps1
+```
+
+Verifies safe timeout handling.
+
+Before running this script, restart the recommender service with a short read timeout:
+
+```powershell
+$env:OLLAMA_READ_TIMEOUT="1s"
+.\gradlew bootRun
+```
+
+Then run the timeout smoke in another terminal:
+
+```powershell
+.\scratch\smoke\run-timeout-smoke.ps1
+```
+
+Expected behavior:
+
+```text
+POST returns QUEUED
+GET eventually returns TIMED_OUT
+validationStatus is INVALID
+failureReason mentions Ollama model generation timeout
+```
+
+After the timeout smoke, stop the recommender service and clear the temporary environment variable:
+
+```powershell
+Remove-Item Env:\OLLAMA_READ_TIMEOUT
+```
+
+Then restart the service normally.
 
 ### Error Response Smoke
 
@@ -462,6 +704,8 @@ Current automated tests focus on recommendation safety behavior, especially:
 * model-output validation
 * unsupported wording rejection
 * candidate-list enforcement
+
+Manual smoke scripts are still required to verify the local end-to-end flow because CI does not run PostgreSQL, Ollama, or the existing EVReady backend.
 
 ## CI
 
@@ -516,7 +760,7 @@ This service does not currently provide:
 
 * user accounts
 * authentication
-* production deployment
+* public production exposure
 * frontend integration
 * live charger availability
 * route planning
@@ -573,6 +817,8 @@ What this project demonstrates:
 * AI integration with an existing deployed product
 * separate service architecture
 * catalog-backed recommendation
+* async model processing for slow local LLMs
+* timeout-safe recommendation handling
 * deterministic filtering before model use
 * structured LLM output
 * deterministic model-output enrichment
@@ -580,4 +826,4 @@ What this project demonstrates:
 * candidate evidence snapshots
 * recommendation run persistence
 * auditability
-* conservative handling of uncertain product and charger data
+* conservative handling of uncertain product, charger, and route data

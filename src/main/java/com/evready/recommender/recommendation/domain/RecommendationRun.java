@@ -115,8 +115,19 @@ public class RecommendationRun {
         this.failureReason = null;
     }
 
+    public void markRunning() {
+        this.status = RecommendationRunStatus.RUNNING;
+    }
+
     public void markFailed(String failureReason, String rawModelOutput) {
         this.status = RecommendationRunStatus.FAILED;
+        this.validationStatus = RecommendationValidationStatus.INVALID;
+        this.failureReason = failureReason;
+        this.rawModelOutput = rawModelOutput;
+    }
+
+    public void markTimedOut(String failureReason, String rawModelOutput) {
+        this.status = RecommendationRunStatus.TIMED_OUT;
         this.validationStatus = RecommendationValidationStatus.INVALID;
         this.failureReason = failureReason;
         this.rawModelOutput = rawModelOutput;
