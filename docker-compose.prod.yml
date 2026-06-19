@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-evready_recommender}
+      POSTGRES_USER: ${DB_USER:?Set DB_USER in the environment}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment}
+    volumes:
+      - recommender_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  internal-recommender:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-evready_recommender}
+      DB_USER: ${DB_USER:?Set DB_USER in the environment}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment}
+      EVREADY_API_BASE_URL: ${EVREADY_API_BASE_URL:-http://backend:8080}
+      LLM_PROVIDER: ${LLM_PROVIDER:-OLLAMA}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:?Set OLLAMA_BASE_URL in the environment}
+      OLLAMA_CONNECT_TIMEOUT: ${OLLAMA_CONNECT_TIMEOUT:-5s}
+      OLLAMA_READ_TIMEOUT: ${OLLAMA_READ_TIMEOUT:-90s}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      OLLAMA_TEMPERATURE: ${OLLAMA_TEMPERATURE:-0}
+      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-1024}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-4096}
+      RECOMMENDATION_PROCESSING_CORE_POOL_SIZE: ${RECOMMENDATION_PROCESSING_CORE_POOL_SIZE:-1}
+      RECOMMENDATION_PROCESSING_MAX_POOL_SIZE: ${RECOMMENDATION_PROCESSING_MAX_POOL_SIZE:-1}
+      RECOMMENDATION_PROCESSING_QUEUE_CAPACITY: ${RECOMMENDATION_PROCESSING_QUEUE_CAPACITY:-10}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://evready.pk,https://www.evready.pk}
+      LOG_PATH: ${LOG_PATH:-/app/logs}
+    expose:
+      - "8081"
+    volumes:
+      - /opt/evready/logs/recommender:${LOG_PATH:-/app/logs}
+    networks:
+      - default
+      - evready_internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  recommender_postgres_data:
+
+networks:
+  evready_internal:
+    external: true
