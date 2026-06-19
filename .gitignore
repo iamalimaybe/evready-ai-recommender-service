@@ -21,6 +21,7 @@ logs/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # Local AI assistant / Codex workflow files
 AGENTS.md
