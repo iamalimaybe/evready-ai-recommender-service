@@ -8,7 +8,7 @@ The core rule is simple: the model can explain and rank options, but it must sta
 
 ## Current Status
 
-EVReady AI Recommender Service is an early MVP backend service.
+EVReady AI Recommender Service is an MVP backend service integrated with EVReady Pakistan through the existing EVReady backend gateway.
 
 Implemented so far:
 
@@ -34,6 +34,7 @@ Implemented so far:
 * create recommendation endpoint
 * retrieve recommendation endpoint
 * consistent API error responses
+* production-shaped backend gateway integration
 * manual smoke scripts
 * focused unit tests for validation and enrichment
 * GitHub Actions build workflow
@@ -66,8 +67,9 @@ The existing EVReady backend owns stable product and operational workflows:
 * reviews
 * feedback
 * admin workflows
+* public API gateway routing
 
-This recommender service owns only recommendation-specific concerns:
+This recommender service owns recommendation-specific concerns:
 
 * recommendation requests
 * candidate filtering
@@ -82,30 +84,22 @@ Keeping this service separate avoids mixing stable product operations with AI or
 
 ## Architecture
 
+Production-shaped request path:
+
 ```text
 EVReady Frontend
-  -> EVReady Backend
-      - vehicle catalogue
-      - charger directory
-      - public forms
-      - reviews and feedback
-      - admin workflows
-
-  -> EVReady AI Recommender Service
-      - recommendation API
-      - EVReady catalogue client
-      - deterministic candidate filtering
-      - asynchronous processing
-      - LLM explanation and ranking
-      - structured output parsing
-      - deterministic output enrichment
-      - safety validation
-      - recommendation run storage
+  -> EVReady Backend API Gateway
+      -> EVReady AI Recommender Service
+          -> Ollama / local model runtime
 ```
+
+The EVReady backend remains the public browser-facing API boundary.
+
+The AI recommender service is intended to run as an internal service behind the backend gateway in production. The browser should not call this service directly in production.
 
 The existing EVReady backend remains the source of catalogue data.
 
-The recommender service does not directly read the existing EVReady production database in version 1.
+The recommender service does not directly read the existing EVReady production database in version 1. It reads catalogue data through backend APIs.
 
 ## Main Use Case
 
@@ -142,6 +136,10 @@ Response includes:
 * failure reason if the response could not be completed safely
 
 ## API Endpoints
+
+These are the recommender service's internal service endpoints.
+
+In production-shaped usage, the public frontend calls the EVReady backend gateway instead of calling these endpoints directly.
 
 ### Select Candidates
 
@@ -197,6 +195,28 @@ Returns the current or final stored recommendation run with persisted recommenda
 
 This endpoint is used for polling after creating a recommendation.
 
+### Health
+
+```http
+GET /actuator/health
+```
+
+Returns service health information.
+
+## Public Gateway Endpoints
+
+The public EVReady backend exposes gateway endpoints for frontend usage:
+
+```http
+POST /api/v1/ai/recommendations
+GET  /api/v1/ai/recommendations/{id}
+GET  /api/v1/ai/recommendations/health
+```
+
+The backend gateway forwards accepted recommendation requests to this internal recommender service.
+
+The backend gateway is also responsible for public-facing controls such as rate limiting expensive recommendation creation requests.
+
 ## Recommendation Statuses
 
 In-progress statuses:
@@ -219,10 +239,10 @@ TIMED_OUT
 
 Expected frontend behavior:
 
-1. submit `POST /api/v1/recommendations`
+1. submit `POST /api/v1/ai/recommendations` to the EVReady backend gateway
 2. store the returned `id`
 3. show a loading state
-4. poll `GET /api/v1/recommendations/{id}`
+4. poll `GET /api/v1/ai/recommendations/{id}` through the backend gateway
 5. continue polling while status is `PENDING`, `QUEUED`, or `RUNNING`
 6. stop polling when a final status is returned
 7. render the recommendation, no-match state, timeout state, or safe failure state
@@ -450,15 +470,16 @@ Browser / evready.pk
       -> internal EVReady AI Recommender Service
 ```
 
-This keeps the recommender service private or protected while the existing EVReady backend remains the public integration point.
+Current production-shaped integration uses the EVReady backend as the public gateway.
 
 Important notes:
 
 * CORS is not a security boundary.
 * A frontend-only API key is not a secret.
 * Browser JavaScript cannot safely hide backend credentials.
-* If the recommender is exposed publicly, it should have rate limiting, request-size limits, queue limits, timeouts, and proper access control.
-* The current service should not be deployed as an unrestricted public model-generation endpoint.
+* The recommender should not be deployed as an unrestricted public model-generation endpoint.
+* Public recommendation creation should be protected at the backend gateway or another controlled backend boundary.
+* The model runtime should not be exposed directly to browsers.
 
 ## Database And Liquibase
 
@@ -571,7 +592,9 @@ RECOMMENDATION_PROCESSING_MAX_POOL_SIZE=1
 RECOMMENDATION_PROCESSING_QUEUE_CAPACITY=10
 ```
 
-Do not commit real secrets.
+Production values should come from server environment configuration, not committed files.
+
+Do not commit real secrets, `.env` files, database passwords, service credentials, or private deployment notes.
 
 ## Local Smoke Scripts
 
@@ -721,6 +744,12 @@ on pushes and pull requests for:
 * `main`
 * `feature/**`
 
+Current CI check:
+
+```text
+Build and test
+```
+
 Current CI does not require PostgreSQL, Ollama, or the EVReady backend because the automated tests are unit-level.
 
 ## Consistent API Errors
@@ -760,10 +789,9 @@ This service does not currently provide:
 
 * user accounts
 * authentication
-* public production exposure
-* frontend integration
+* direct public production exposure
 * live charger availability
-* route planning
+* route planning guarantees
 * dealer stock checks
 * booking
 * payments
@@ -816,6 +844,7 @@ What this project demonstrates:
 
 * AI integration with an existing deployed product
 * separate service architecture
+* backend-gateway production integration
 * catalog-backed recommendation
 * async model processing for slow local LLMs
 * timeout-safe recommendation handling
